@@ -36,4 +36,8 @@
         <PackageReference Include="Chaos.Pathfinding"/>
         <PackageReference Include="TextCopy"/>
     </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Chaos.Client.Tests"/>
+    </ItemGroup>
 </Project>
