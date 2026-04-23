@@ -965,6 +965,12 @@ public sealed partial class WorldScreen
 
         if (direction.HasValue)
         {
+            //any movement intent dismisses the door context menu. right-click-driven movement is
+            //already covered by the outside-click guard in OnRootMouseDown; this path catches
+            //keyboard movement (arrows + zxcv).
+            if (DoorContext.Visible)
+                DoorContext.Hide();
+
             Pathfinding.Clear();
             var player = WorldState.GetPlayerEntity();
 
@@ -1019,6 +1025,17 @@ public sealed partial class WorldScreen
     /// </summary>
     private void OnRootMouseDown(MouseDownEvent e)
     {
+        //door context menu dismisses on any click outside its bounds — clicks on the menu itself
+        //are consumed by DoorContextMenu.OnClick and never reach here. swallow the event so the
+        //same click doesn't ALSO kick off pathfinding/attack on the tile underneath.
+        if (DoorContext.Visible && !DoorContext.ContainsPoint(e.ScreenX, e.ScreenY))
+        {
+            DoorContext.Hide();
+            e.Handled = true;
+
+            return;
+        }
+
         if (e.Button != MouseButton.Right)
             return;
 
@@ -1504,7 +1521,7 @@ public sealed partial class WorldScreen
 
     private List<(string Label, Action Callback)> FindNearbyDoors(int mouseX, int mouseY)
     {
-        var results = new List<(int DistanceSq, string Label, Action Callback)>();
+        var results = new List<DoorProximityDedup.DoorHit<(string Label, Action Callback)>>();
 
         if (MapFile is null)
             return [];
@@ -1567,16 +1584,20 @@ public sealed partial class WorldScreen
                 var doorY = ty;
                 Action callback = () => Game.Connection.ClickTile(doorX, doorY);
 
-                results.Add((distSq, label, callback));
+                results.Add(new DoorProximityDedup.DoorHit<(string, Action)>(distSq, tx, ty, (label, callback)));
             }
 
         results.Sort(static (a, b) => a.DistanceSq.CompareTo(b.DistanceSq));
 
-        var limit = Math.Min(results.Count, DoorContextMenu.MAX_ENTRIES);
+        //collapse multi-tile doors: a 2/3/4-tile door registers each panel separately, but should
+        //appear as one menu entry. see DoorProximityDedup for the 4-neighbor adjacency rule.
+        var deduped = DoorProximityDedup.CollapseAdjacent(results);
+
+        var limit = Math.Min(deduped.Count, DoorContextMenu.MAX_ENTRIES);
         var final = new List<(string Label, Action Callback)>(limit);
 
         for (var i = 0; i < limit; i++)
-            final.Add((results[i].Label, results[i].Callback));
+            final.Add(deduped[i].Payload);
 
         return final;
     }
