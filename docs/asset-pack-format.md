@@ -183,6 +183,49 @@ With `_manifest.json`:
 
 `dimensions` is optional for nation badges since the image is drawn at its placed UI bounds rather than a fixed slot size.
 
+## Content type: `legend_mark_icons`
+
+Legend-mark-icon packs override the legacy `legends.epf` frame sheet (palette 3 of `national.dat`) — the small icons shown beside each legend entry in the self profile's Legend tab. Legacy icons are roughly 21×20 pixels; modern PNGs are drawn at their own pixel dimensions into the row cell, so larger art will overflow until the Tier 3 panel-layout pass gives rows a larger icon box.
+
+### Naming convention
+
+```
+legend{id:D4}.png    e.g. legend0000.png, legend0001.png, legend0042.png
+```
+
+- Icon ID is **0-based** — a deliberate deviation from the 1-based `ability_icons` and `nation_badges` conventions. The server sends each legend mark's icon as a raw byte used directly as the frame index into legacy `legends.epf`, so `legend0000.png` replaces EPF frame 0 and corresponds to server icon ID 0.
+- Missing PNGs fall back to the legacy EPF frame for that ID.
+- Case-insensitive (`.PNG` and `.png` both work).
+
+### Minimal example
+
+```
+hyblegends.datf
+├── _manifest.json
+├── legend0000.png
+├── legend0001.png
+└── legend0002.png
+```
+
+With `_manifest.json`:
+
+```json
+{
+  "schema_version": 1,
+  "pack_id": "hybrasyl-legend-marks",
+  "pack_version": "0.1.0",
+  "content_type": "legend_mark_icons",
+  "priority": 100,
+  "covers": {
+    "legend_mark_icons": { }
+  }
+}
+```
+
+`dimensions` is optional — the renderer uses each PNG's own pixel dimensions rather than a fixed slot size.
+
+See [legend-mark-icons-authoring-guide.md](legend-mark-icons-authoring-guide.md) for art direction, legacy source extraction, and a full authoring walkthrough.
+
 ## Troubleshooting
 
 - **Pack not loading:** check stderr for `[asset-pack]` warnings at startup. Common causes: missing `_manifest.json`, malformed JSON, `schema_version` higher than the client supports, unknown `content_type`.
