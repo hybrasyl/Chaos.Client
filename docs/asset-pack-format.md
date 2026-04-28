@@ -183,6 +183,59 @@ With `_manifest.json`:
 
 `dimensions` is optional for nation badges since the image is drawn at its placed UI bounds rather than a fixed slot size.
 
+## Content type: `static_tiles`
+
+Static-tile packs override individual map tiles — `tilea*`-style background (floor) tiles and HPF-format foreground (wall) tiles — with PNGs. **"Static" deliberately excludes:**
+
+- **Palette-cycled tiles** (water, lava). The cycling overlay system runs every frame and would visually overwrite any pack PNG; the renderer skips pack lookup for cycled IDs to save a decode.
+- **Frame-animated tiles** (driven by `gndani.tbl` / `stcani.tbl`). A static pack would cover only the base frame, producing glitchy alternation between modern base and legacy frames. Skipped automatically.
+
+These limitations are temporary — the future `tiles` content type will add frame arrays + palette cycling support. Use this `static_tiles` type today for non-animated, non-cycled tiles.
+
+### Naming convention
+
+```
+floor{id:D5}.png    e.g. floor00001.png, floor00524.png, floor04200.png
+wall{id:D5}.png     e.g. wall00001.png, wall12345.png
+```
+
+- Tile ID is the value stored directly in the map file's `MapTile.Background` (for floor) or `LeftForeground` / `RightForeground` (for wall) — same as what the map editor / tile catalog displays. **No offset adjustment.**
+- IDs are zero-padded to 5 digits (`D5`, comfortable headroom over realistic tile counts).
+- Floor and wall namespaces share one pack. A single `.datf` can ship any mix of `floor*.png` and `wall*.png`.
+- Missing PNGs fall back to legacy (`Tileset` for floor, `stc{id:D5}.hpf` for wall).
+- Packs for IDs the renderer auto-skips (cycled or animated) are silently ignored — no warning logged. Author responsibility to know which IDs are eligible; see [static-tiles-authoring-guide.md](static-tiles-authoring-guide.md) for guidance.
+
+### Dimensions
+
+- **Floor tiles:** 56×27 pixels (matches legacy `Tile` dimensions). Modern packs author at this size for v1; larger sizes mechanically work but will be downscaled by the atlas builder.
+- **Wall tiles:** 28 pixels wide, variable height (matches legacy HPF). The atlas's shelf packer accommodates any height.
+
+### Minimal example
+
+```
+hyb-tiles.datf
+├── _manifest.json
+├── floor00524.png
+└── wall12345.png
+```
+
+With `_manifest.json`:
+
+```json
+{
+  "schema_version": 1,
+  "pack_id": "hybrasyl-static-tiles",
+  "pack_version": "0.1.0",
+  "content_type": "static_tiles",
+  "priority": 100,
+  "covers": {
+    "static_tiles": { }
+  }
+}
+```
+
+See [static-tiles-authoring-guide.md](static-tiles-authoring-guide.md) for the full authoring walkthrough — identifying which tile IDs are eligible, reference extraction from legacy archives, and QA flow.
+
 ## Troubleshooting
 
 - **Pack not loading:** check stderr for `[asset-pack]` warnings at startup. Common causes: missing `_manifest.json`, malformed JSON, `schema_version` higher than the client supports, unknown `content_type`.
