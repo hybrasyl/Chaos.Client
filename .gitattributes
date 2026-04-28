@@ -1,0 +1,28 @@
+* text=auto eol=lf
+
+# binary types — never normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.bmp binary
+
+*.epf binary
+*.spf binary
+*.mpf binary
+*.efa binary
+*.hpf binary
+*.tbl binary
+*.dat binary
+*.datf binary
+*.map binary
+*.bin binary
+
+*.ttf binary
+*.otf binary
+*.fnt binary
+
+*.zip binary
+*.gz binary
+*.7z binary
