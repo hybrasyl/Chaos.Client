@@ -571,6 +571,18 @@ Almost everything a fork needs to change is in `Chaos.Client/GlobalSettings.cs`:
 | `LobbyPort`            | Lobby server port.                                                                                                                  |
 | `RequireSwimmingSkill` | When `true`, restores retail swim gate — water tiles require the GM flag or the `Swimming` skill. Default `false` (no requirement). |
 
+### Environment-variable overrides
+
+The following env vars override the defaults at startup without requiring a rebuild. Useful for dev workflows, CI, and launchers that need to redirect the client to a different lobby or data directory.
+
+| Env var         | Overrides     | Validation                                                |
+|-----------------|---------------|-----------------------------------------------------------|
+| `DA_HOST`       | `LobbyHost`   | Non-empty, non-whitespace; else default `da0.kru.com`.    |
+| `DA_HOST_PORT`  | `LobbyPort`   | Integer 1–65535; else default `2610`.                     |
+| `DA_ASSET_PATH` | `DataPath`    | Path string; not validated by the client.                 |
+
+The resolved lobby target (and the raw env-var values it was derived from) is written to `notice-debug.log` at startup, so an override that was rejected by validation is visible without attaching a debugger.
+
 ## Extending
 
 ### Adding a UI panel

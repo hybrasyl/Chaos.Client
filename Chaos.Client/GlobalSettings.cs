@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Chaos.Client.Data;
+using Chaos.Client.Networking;
 using Chaos.Client.Systems;
 using Microsoft.Xna.Framework.Graphics;
 #endregion
@@ -23,10 +24,25 @@ public static class GlobalSettings
     public static string DataPath { get; set; } = Environment.GetEnvironmentVariable("DA_ASSET_PATH") ?? 
                                                   Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
 
-    public static string LobbyHost { get; set; } = Environment.GetEnvironmentVariable("DA_HOST") ?? "da0.kru.com";
+    public static string LobbyHost
+    {
+        get
+        {
+            var env = Environment.GetEnvironmentVariable("DA_HOST");
+            return string.IsNullOrWhiteSpace(env) ? "da0.kru.com" : env;
+        }
+    }
 
-    public static int LobbyPort { get; set; } =
-        short.TryParse(Environment.GetEnvironmentVariable("DA_HOST_PORT"), out var val) ? val : 2610;
+    public static int LobbyPort
+    {
+        get
+        {
+            var env = Environment.GetEnvironmentVariable("DA_HOST_PORT");
+            if (int.TryParse(env, out var port) && port is >= 1 and <= 65535)
+                return port;
+            return 2610;
+        }
+    }
 
     /// <summary>
     ///     When true, walking onto a water tile requires either the GM flag or the "Swimming" skill.
@@ -39,6 +55,12 @@ public static class GlobalSettings
     private static void InitializeOthers()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+        var hostEnv = Environment.GetEnvironmentVariable("DA_HOST");
+        var portEnv = Environment.GetEnvironmentVariable("DA_HOST_PORT");
+        NoticeDebugLog.Write(
+            $"lobby target {LobbyHost}:{LobbyPort} "
+            + $"(DA_HOST={hostEnv ?? "(unset)"}, DA_HOST_PORT={portEnv ?? "(unset)"})");
 
         DataContext.Initialize(
             ClientVersion,
