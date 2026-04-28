@@ -15,7 +15,7 @@ public static class DoorTable
 
     static DoorTable()
     {
-        //sorted by closed sprite id. see docs/doors.md for door-group context (axis, tile count, center-only flag).
+        //sorted by closed sprite id. see doors.md in the document repo for door-group context (axis, tile count, center-only flag).
         var pairs = new (short Closed, short Open)[]
         {
             (1993, 1996), (1994, 1997),
