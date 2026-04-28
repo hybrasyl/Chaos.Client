@@ -26,7 +26,7 @@ The MonoGame-side foundation is mostly already in place — the existing compone
 - **Frame approach:** simple 1-2px `BorderColor` rect, already supported by `UIPanel`. Modern-flat baseline. No programmatic beveled-frame helper.
 - **Slider:** add a new `UiSlider` primitive-only control alongside the existing texture-driven [SliderControl](../Chaos.Client/Controls/Generic/SliderControl.cs). Keeps the legacy slider unmodified; primitive panels use the new control. Cleaner separation, easier to retire the legacy slider later if/when it stops being used.
 - **`UiSlider` namespace placement:** [Chaos.Client/Controls/Components/](../Chaos.Client/Controls/Components/) alongside `UIButton`/`UIPanel`. Treats `UiSlider` as a first-class primitive component, not a legacy-style "generic" control.
-- **Theme constants location (Phase 0):** extend [LegendColors](../Chaos.Client.Rendering/Definitions/LegendColors.cs). Single home for all named UI colors during Phase 0. See "Open future considerations" below — long-term, the color/theme model likely wants a rethink.
+- **Theme constants location (Phase 0):** **purely additive** extension to [LegendColors](../Chaos.Client.Rendering/Definitions/LegendColors.cs) — no refactor, no breaking changes, no signature edits to existing properties. Just new static properties for UI chrome constants alongside the existing palette-derived ones. Backwards compatibility is the explicit constraint here. Long-term, the broader color/theme model likely wants a rethink — but that's a multi-repo workstream (see "Color is its own workstream" below) and is **explicitly not Phase 0**.
 - **Phase 0 sequencing:** independent of pack tiers. Runs **before or alongside Phase 1** (`feature/ui-asset-packs-tier1`). Does not block or depend on Tier 1/2/3 pack work.
 
 ## Component audit — what exists, what's missing
@@ -142,11 +142,10 @@ Per [CLAUDE.md](../CLAUDE.md) review policy, each phase ends with bug/regression
 
 These came out of scoping but are explicitly *not* part of Phase 0. Captured here so they're visible when the team plans follow-up phases.
 
-1. **Color/theme model rethink.** [LegendColors](../Chaos.Client.Rendering/Definitions/LegendColors.cs) today is a static class of palette-derived `Color` properties initialized from `legend.pal` (DAT-sourced, `LegendColor` enum mapped to MonoGame `Color`). Adding hardcoded UI chrome constants there mixes two concerns. The bigger question the team flagged: **panels should eventually be able to set their own colors at construction**, not just consume globals. Options for a future pass:
-   - **Optional ctor parameters** on each primitive panel (e.g., `new MyPanel(buttonTheme: ..., borderColor: ...)`) defaulting to the `LegendColors` constants. Smallest change.
+1. **Per-panel color customization (small, client-only).** Phase 0 panels read colors from `LegendColors` globals. The team flagged that **panels should eventually be able to set their own colors at construction**, not just consume globals. Note that `UIElement.BackgroundColor`/`BorderColor` and `UILabel.ForegroundColor` are *already* mutable properties — so the smallest change is no new infrastructure at all, just having panel constructors accept optional color overrides and assign them to the existing properties. Larger options if a richer API is wanted later:
+   - **Optional ctor parameters** on each primitive panel (e.g., `new MyPanel(buttonTheme: ..., borderColor: ...)`) defaulting to the `LegendColors` constants. Smallest change beyond the trivial.
    - **A `ButtonTheme` / `PanelTheme` record** passed to constructors, encapsulating a related color set. Cleaner API but more types.
    - **A theme registry** (`ThemeRegistry.Default.ButtonNormalBg`) overridable at startup. Most flexible, most indirection.
-   - **Split `LegendColors`** into `LegendColors` (palette-derived) and a new `UiChromeColors` (hardcoded UI constants). Resolves the mixed-concern issue but doesn't address per-panel customization.
 
    No decision needed for Phase 0; resolve when a concrete consumer needs per-panel color override.
 
@@ -155,6 +154,37 @@ These came out of scoping but are explicitly *not* part of Phase 0. Captured her
 3. **`SliderControl` retirement.** Once `UiSlider` is in place and pause menu is migrated, audit remaining `SliderControl` consumers. If none remain (or the legacy ones can also migrate cheaply), the texture-driven slider becomes deletable. Track but don't force.
 
 4. **Modern-flat baseline color sanity-check.** The `RGB 36,36,40` background and `RGB 170,170,180` border were chosen ad-hoc when the pause menu was authored. Once these become canonical via `LegendColors`, worth a quick design pass — these are the de facto Hybrasyl modern look across every primitive panel forever, so they deserve more than "first thing that looked OK."
+
+## Color is its own workstream (cross-repo, multi-system)
+
+The Phase 0 `LegendColors` extension is intentionally narrow: a few hardcoded RGB constants for client-side UI chrome, additive only. The broader question of "how should color work across Hybrasyl" is much bigger and explicitly out of scope here. Captured for visibility:
+
+The current color model spans at least three repos and several distinct enums, all rooted in legacy Dark Ages palette indices:
+
+| Repo / file | Type | Purpose | Values |
+| --- | --- | --- | --- |
+| Client: [Chaos.Client.Rendering/Definitions/LegendColors.cs](../Chaos.Client.Rendering/Definitions/LegendColors.cs) | static class, `Color` properties | Converts client-side `LegendColor` enum → MonoGame `Color` via `legend.pal` DAT lookup | 38 named colors |
+| Client: `Chaos.Client.Data.Definitions/LegendColor.cs` | enum | Client-side enum mirroring server's palette indices | ~38 entries |
+| Server: `server/hybrasyl/Internals/Enums/LegendColor.cs` | enum (int values) | Server-side palette indices for legend marks | 19 entries: Aqua=1, White=32, Pink=36, ..., Red=248 |
+| Server: `server/hybrasyl/Internals/Enums/TextColor.cs` | enum (int values) | Palette indices for text rendering | 16 entries: Red=62, Yellow=63, ..., Pink=77 |
+| Server: `server/hybrasyl/Internals/Enums/SkinColor.cs` | enum | Character skin color identifiers | 10 entries: Basic=0, White=1, ..., Purple=9 |
+| Server: `server/hybrasyl/Internals/Enums/StatusBarColor.cs` | byte enum | Buff/debuff bar colors | 6 entries: Off=0, Blue=1, ..., White=5 |
+| XML: `xml/src/Objects/ItemColor.cs` | XSD-generated enum | Named colors for item authoring in Hybrasyl XML schema | ~70 entries: None, Black, Red, Auburn, ... |
+
+Why this is a workstream, not a quick fix:
+
+- **Wire format is palette indices, not RGB.** The legacy DA protocol carries small integer color identifiers. Server says "render this with color N" and the client looks up palette N in its DAT-loaded color table. Adding modern RGB would require either protocol extension (new packet variants for RGB colors, capability negotiation per the additive modernization pattern) or a hybrid scheme (e.g., palette indices >256 mean RGB encoded inline).
+- **Multiple color *spaces*, not just a unified table.** Legend marks, text, skins, status bars, and items each have their own enum mapping to different palette indices. A modernization can't just swap in a global RGB table — each surface has its own constraints (skins are constrained by character art, text colors by readability against game backgrounds, etc.).
+- **Hybrasyl XML schema is auto-generated** (`Xsd2Code++`). Changes to `ItemColor` happen at the XSD level, then regenerate. Touching it is also a server-content authoring concern (existing items reference these names).
+- **Server-side enums need server changes.** Anything that reshapes `LegendColor`/`TextColor`/`SkinColor`/`StatusBarColor` requires Hybrasyl server work, not just client work.
+
+What this means for Phase 0:
+
+- The Phase 0 chrome additions to `LegendColors` are **purely client-side, purely additive, hardcoded RGB constants for UI chrome that has no server/protocol involvement**. Pause-menu button colors, primitive slider colors, etc. They never touch the wire and never need server cooperation.
+- Anything that *would* need server cooperation (e.g., a future "user-themable text colors" feature, custom item dye palettes, new legend mark colors) belongs in the broader color workstream and should be scoped separately.
+- The existing `LegendColors` palette-derived properties stay exactly as they are — the wire-protocol-driven color path is untouched in Phase 0.
+
+When the broader color workstream is eventually scoped, it should consider all the files in the table above as a single coordinated effort rather than tackling them one at a time.
 
 ## Status
 
