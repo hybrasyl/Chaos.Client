@@ -53,7 +53,7 @@ The manifest is required; everything else is convention-based depending on the p
 | `schema_version` | yes | Integer. Always `1` for current clients. Bump only on breaking changes. Clients reject packs declaring a schema version they don't understand. |
 | `pack_id` | yes | Lowercase identifier. Unique per pack. Used for logging. |
 | `pack_version` | yes | Semver. Informational; shown in debug overlay. |
-| `content_type` | yes | Type discriminator. v1 known value: `ability_icons`. Future: `tiles`, `creatures`, `ui_sprites`, `effects`, `bundle`. |
+| `content_type` | yes | Type discriminator. v1 known values: `ability_icons`, `nation_badges`, `legend_mark_icons`. Future: `tiles`, `creatures`, `ui_sprites`, `effects`, `bundle`. |
 | `priority` | no | Integer, default `100`. Higher wins when multiple packs of the same type are registered. |
 | `covers` | yes | Capability declaration: which categories this pack participates in, with per-category metadata the renderer needs. |
 
@@ -245,6 +245,6 @@ The format is extensible. Planned future `content_type` values:
 | `effects` | Spell/combat effects (replaces EFA) | Frame timings, blend mode (additive), anchor |
 | `bundle` | Multi-type pack (one archive shipping several categories) | `covers` enumerates multiple categories |
 
-Implemented content types: `ability_icons`, `nation_badges`.
+Implemented content types: `ability_icons`, `nation_badges`, `legend_mark_icons`.
 
 The ability-icons schema is the minimal case. Future types will extend it; the v1 schema version won't change unless an existing field's meaning changes.
