@@ -1,12 +1,10 @@
 #region
 using System.Buffers;
 using System.Net;
-using System.Text;
 using Chaos.Cryptography;
 using Chaos.DarkAges.Definitions;
 using Chaos.Geometry;
 using Chaos.Geometry.Abstractions.Definitions;
-using Chaos.IO.Memory;
 using Chaos.Networking.Abstractions.Definitions;
 using Chaos.Networking.Entities.Client;
 using Chaos.Networking.Entities.Server;
@@ -144,39 +142,6 @@ public sealed class ConnectionManager : IDisposable
                 ClickType = ClickType.TargetPoint,
                 TargetPoint = new Point(x, y)
             });
-
-    /// <summary>
-    ///     Sends a click on a door tile, with the trailing layer byte that retail's 0x43 handler appears to use to
-    ///     dispatch to the correct foreground entity. The standard <see cref="ClickArgs" /> serialization (5 bytes:
-    ///     type + x + y) is missing this byte. Retail accepts the short packet for E/W doors (panels live in
-    ///     LeftForeground) but silently drops it for N/S doors (panels in RightForeground), no 0x0C/0x0E broadcast.
-    ///     Hypothesis derived from kedian's RE of retail's inbound 0x32 handler (FUN_005e64a0): IsLeftRight = 1
-    ///     selects layer 0 (LeftForeground), IsLeftRight = 0 selects layer 1 (RightForeground). Outbound click
-    ///     presumably uses the same byte to tell the server which layer to operate on. Mapping not yet confirmed
-    ///     against retail; if N/S still fails after this fix, try inverting the byte values at the call sites.
-    /// </summary>
-    /// <param name="x">Tile x.</param>
-    /// <param name="y">Tile y.</param>
-    /// <param name="layer">
-    ///     Hypothesis: 1 = LeftForeground (E/W door panels), 0 = RightForeground (N/S panels). Verify against retail
-    ///     and invert if N/S still doesn't toggle.
-    /// </param>
-    public void ClickDoor(int x, int y, byte layer)
-    {
-        if (State != ConnectionState.World)
-            return;
-
-        //bypass ClickArgs/ClickConverter: both are sealed in Chaos.Networking and don't expose this trailing byte. once
-        //chaos.networking-removal lands we can put this back into a normal converter.
-        var writer = new SpanWriter(Encoding.GetEncoding(949), usePooling: true);
-        writer.WriteByte((byte)ClickType.TargetPoint);
-        writer.WriteUInt16((ushort)x);
-        writer.WriteUInt16((ushort)y);
-        writer.WriteByte(layer);
-        var ownership = writer.TransferOwnership();
-        var packet = new Packet((byte)ClientOpCode.Click, ownership.Owner, ownership.Length);
-        Client.Send(ref packet);
-    }
 
     /// <summary>
     ///     Sends a world map node click.
