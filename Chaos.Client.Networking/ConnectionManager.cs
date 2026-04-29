@@ -1,10 +1,12 @@
 #region
 using System.Buffers;
 using System.Net;
+using System.Text;
 using Chaos.Cryptography;
 using Chaos.DarkAges.Definitions;
 using Chaos.Geometry;
 using Chaos.Geometry.Abstractions.Definitions;
+using Chaos.IO.Memory;
 using Chaos.Networking.Abstractions.Definitions;
 using Chaos.Networking.Entities.Client;
 using Chaos.Networking.Entities.Server;
@@ -142,6 +144,39 @@ public sealed class ConnectionManager : IDisposable
                 ClickType = ClickType.TargetPoint,
                 TargetPoint = new Point(x, y)
             });
+
+    /// <summary>
+    ///     Sends a click on a known door tile, including the trailing layer + modifier bytes that retail's 0x43 handler
+    ///     uses to dispatch to the correct foreground entity. Empirically verified against legacy DA Darkages.exe via
+    ///     packet capture (2026-04-29):
+    ///     <code>
+    ///       N/S door (panel in RFG): layer = 1
+    ///       E/W door (panel in LFG): layer = 0
+    ///     </code>
+    ///     Modifier byte is 0 for an unmodified click. Hybrasyl drops both trailing bytes; retail strictly requires this
+    ///     shape for door dispatch — without the layer byte, retail silently rejects N/S door clicks (defaults to layer
+    ///     0 = LFG and finds nothing where the panel actually lives in RFG). Bypasses the sealed
+    ///     <see cref="ClickArgs"/>/<c>ClickConverter</c> in Chaos.Networking; once that package is removed, this folds
+    ///     back into a normal converter.
+    /// </summary>
+    /// <param name="x">Tile x.</param>
+    /// <param name="y">Tile y.</param>
+    /// <param name="layer">0 = LeftForeground (E/W door panels), 1 = RightForeground (N/S panels).</param>
+    public void ClickDoor(int x, int y, byte layer)
+    {
+        if (State != ConnectionState.World)
+            return;
+
+        var writer = new SpanWriter(Encoding.GetEncoding(949), usePooling: true);
+        writer.WriteByte((byte)ClickType.TargetPoint);
+        writer.WriteUInt16((ushort)x);
+        writer.WriteUInt16((ushort)y);
+        writer.WriteByte(layer);
+        writer.WriteByte(0x00);
+        var ownership = writer.TransferOwnership();
+        var packet = new Packet((byte)ClientOpCode.Click, ownership.Owner, ownership.Length);
+        Client.Send(ref packet);
+    }
 
     /// <summary>
     ///     Sends a world map node click.
