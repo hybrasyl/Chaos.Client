@@ -1402,6 +1402,26 @@ public sealed partial class WorldScreen
         if (entity?.Type is ClientEntityType.Creature)
             Game.Connection.ClickEntity(entity.Id);
         else if (TileHasForeground(tileX, tileY))
+            ClickForegroundTile(tileX, tileY);
+    }
+
+    /// <summary>
+    ///     Routes a foreground-tile click to the appropriate send path. Door tiles use <see cref="ConnectionManager.ClickDoor" />
+    ///     so the trailing layer byte retail's 0x43 handler needs is included; non-door foreground (signposts and any other
+    ///     interactable) uses the standard 5-byte <see cref="ConnectionManager.ClickTile" />.
+    /// </summary>
+    private void ClickForegroundTile(int tileX, int tileY)
+    {
+        if (MapFile is null)
+            return;
+
+        var tile = MapFile.Tiles[tileX, tileY];
+
+        if (DoorTable.IsDoorTile(tile.LeftForeground))
+            Game.Connection.ClickDoor(tileX, tileY, 1);
+        else if (DoorTable.IsDoorTile(tile.RightForeground))
+            Game.Connection.ClickDoor(tileX, tileY, 0);
+        else
             Game.Connection.ClickTile(tileX, tileY);
     }
 
@@ -1582,7 +1602,11 @@ public sealed partial class WorldScreen
 
                 var doorX = tx;
                 var doorY = ty;
-                Action callback = () => Game.Connection.ClickTile(doorX, doorY);
+
+                //layer byte mirrors the left-click path: 1 if door panel sits in LeftForeground, else 0 for RightForeground.
+                //captured into a local so the lambda closes over the byte rather than re-checking lfg/rfg at click time.
+                byte doorLayer = DoorTable.IsDoorTile(lfg) ? (byte)1 : (byte)0;
+                Action callback = () => Game.Connection.ClickDoor(doorX, doorY, doorLayer);
 
                 results.Add(new DoorProximityDedup.DoorHit<(string, Action)>(distSq, tx, ty, (label, callback)));
             }
