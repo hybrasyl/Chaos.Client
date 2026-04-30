@@ -699,7 +699,12 @@ public sealed partial class WorldScreen
         if (Root is null)
             return;
 
-        var popup = new OkPopupMessageControl(true);
+        //high ZIndex so the popup floats above all panels (StatusBook, GroupTabControl, dialogs, ...).
+        //10 matches DisconnectPopup, the only other interruption-class modal.
+        var popup = new OkPopupMessageControl(true)
+        {
+            ZIndex = 10
+        };
         Root.AddChild(popup);
 
         popup.OnOk += () =>

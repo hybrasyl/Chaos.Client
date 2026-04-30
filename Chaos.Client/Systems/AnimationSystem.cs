@@ -643,6 +643,13 @@ public static class AnimationSystem
         //this maintains the 2:1 isometric pixel ratio and prevents 1px wobble.
         var startX = (int)startOffset.X;
         var startY = (int)startOffset.Y;
+
+        //zero-x means StartWalk was called with a non-cardinal Direction — GetWalkOffset's _ default
+        //returns Vector2.Zero. there's no horizontal movement to anchor y on, and the divide on line
+        //below (`x * startY / startX`) would throw DivideByZeroException. drop straight to zero.
+        if (startX == 0)
+            return Vector2.Zero;
+
         var framesLeft = frameCount - (frameIndex + 1);
 
         var x = startX * framesLeft / frameCount;
