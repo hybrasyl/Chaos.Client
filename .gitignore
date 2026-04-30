@@ -410,3 +410,6 @@ CLAUDE.local.md
 
 # SDL / etc for non-Windows platforms
 runtimes/*
+
+# diagnostic dumps from Scripts/dump-prefab-images.{sh,ps1} and similar
+output/
